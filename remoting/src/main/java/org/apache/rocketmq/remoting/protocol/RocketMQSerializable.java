@@ -26,6 +26,7 @@ public class RocketMQSerializable {
     private static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
 
     public static byte[] rocketMQProtocolEncode(RemotingCommand cmd) {
+        //remark二进制数据和长度
         // String remark
         byte[] remarkBytes = null;
         int remarkLen = 0;
@@ -34,6 +35,7 @@ public class RocketMQSerializable {
             remarkLen = remarkBytes.length;
         }
 
+        //extFields二进制数据和长度
         // HashMap<String, String> extFields
         byte[] extFieldsBytes = null;
         int extLen = 0;
@@ -42,6 +44,7 @@ public class RocketMQSerializable {
             extLen = extFieldsBytes.length;
         }
 
+        //计算总长度
         int totalLen = calTotalLen(remarkLen, extLen);
 
         ByteBuffer headerBuffer = ByteBuffer.allocate(totalLen);
@@ -85,10 +88,10 @@ public class RocketMQSerializable {
             Map.Entry<String, String> entry = it.next();
             if (entry.getKey() != null && entry.getValue() != null) {
                 kvLength =
-                    // keySize + Key
-                    2 + entry.getKey().getBytes(CHARSET_UTF8).length
-                        // valSize + val
-                        + 4 + entry.getValue().getBytes(CHARSET_UTF8).length;
+                        // keySize + Key
+                        2 + entry.getKey().getBytes(CHARSET_UTF8).length
+                                // valSize + val
+                                + 4 + entry.getValue().getBytes(CHARSET_UTF8).length;
                 totalLength += kvLength;
             }
         }
@@ -114,38 +117,57 @@ public class RocketMQSerializable {
         return content.array();
     }
 
+    /**
+     * 计算头部长度
+     *
+     * @param remark
+     * @param ext
+     * @return
+     */
     private static int calTotalLen(int remark, int ext) {
         // int code(~32767)
         int length = 2
-            // LanguageCode language
-            + 1
-            // int version(~32767)
-            + 2
-            // int opaque
-            + 4
-            // int flag
-            + 4
-            // String remark
-            + 4 + remark
-            // HashMap<String, String> extFields
-            + 4 + ext;
+                // LanguageCode language
+                + 1
+                // int version(~32767)
+                + 2
+                // int opaque
+                + 4
+                // int flag
+                + 4
+                // String remark
+                + 4 + remark
+                // HashMap<String, String> extFields
+                + 4 + ext;
 
         return length;
     }
 
+    /**
+     * 反序列化头部信息
+     *
+     * @param headerArray
+     * @return
+     */
     public static RemotingCommand rocketMQProtocolDecode(final byte[] headerArray) {
         RemotingCommand cmd = new RemotingCommand();
         ByteBuffer headerBuffer = ByteBuffer.wrap(headerArray);
+        // 取两个字节
         // int code(~32767)
         cmd.setCode(headerBuffer.getShort());
+        //取一个字节
         // LanguageCode language
         cmd.setLanguage(LanguageCode.valueOf(headerBuffer.get()));
+        //取两个字节
         // int version(~32767)
         cmd.setVersion(headerBuffer.getShort());
+        //取四个字节
         // int opaque
         cmd.setOpaque(headerBuffer.getInt());
+        //取四个字节
         // int flag
         cmd.setFlag(headerBuffer.getInt());
+        //取出自定义信息的长度
         // String remark
         int remarkLength = headerBuffer.getInt();
         if (remarkLength > 0) {
@@ -154,6 +176,7 @@ public class RocketMQSerializable {
             cmd.setRemark(new String(remarkContent, CHARSET_UTF8));
         }
 
+        //取出扩展信息段的长度
         // HashMap<String, String> extFields
         int extFieldsLength = headerBuffer.getInt();
         if (extFieldsLength > 0) {
