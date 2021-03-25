@@ -282,6 +282,7 @@ public class RemotingCommand {
     }
 
     public void markResponseType() {
+        //1 左移 0位 还是1
         int bits = 1 << RPC_TYPE;
         this.flag |= bits;
     }
@@ -532,8 +533,18 @@ public class RemotingCommand {
         this.flag |= bits;
     }
 
+    public static void main(String[] args) {
+        System.out.println(1<<RPC_ONEWAY);
+        System.out.println((1<<RPC_ONEWAY)|0);
+
+        int bits = 1 << RPC_TYPE;
+        System.out.println(bits);
+        System.out.println(0 | bits);
+    }
+
     @JSONField(serialize = false)
     public boolean isOnewayRPC() {
+        //1 左移 1位
         int bits = 1 << RPC_ONEWAY;
         return (this.flag & bits) == bits;
     }
@@ -557,7 +568,9 @@ public class RemotingCommand {
 
     @JSONField(serialize = false)
     public boolean isResponseType() {
+        //1 左移0位 还是1
         int bits = 1 << RPC_TYPE;
+        //判断flag是否等于1
         return (this.flag & bits) == bits;
     }
 
