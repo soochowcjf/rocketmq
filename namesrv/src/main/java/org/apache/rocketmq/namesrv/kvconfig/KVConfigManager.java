@@ -22,25 +22,30 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.common.protocol.body.KVTable;
 import org.apache.rocketmq.namesrv.NamesrvController;
+
 public class KVConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
     private final NamesrvController namesrvController;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private final HashMap<String/* Namespace */, HashMap<String/* Key */, String/* Value */>> configTable =
-        new HashMap<String, HashMap<String, String>>();
+    private final HashMap<String/* Namespace */, HashMap<String/* Key */, String/* Value */>> configTable = new HashMap<String, HashMap<String, String>>();
 
     public KVConfigManager(NamesrvController namesrvController) {
         this.namesrvController = namesrvController;
     }
 
+    /**
+     * ${user.home}/namesrv/kvConfig.json
+     * 启动时从指定路径加载配置表
+     */
     public void load() {
         String content = null;
         try {
@@ -50,7 +55,7 @@ public class KVConfigManager {
         }
         if (content != null) {
             KVConfigSerializeWrapper kvConfigSerializeWrapper =
-                KVConfigSerializeWrapper.fromJson(content, KVConfigSerializeWrapper.class);
+                    KVConfigSerializeWrapper.fromJson(content, KVConfigSerializeWrapper.class);
             if (null != kvConfigSerializeWrapper) {
                 this.configTable.putAll(kvConfigSerializeWrapper.getConfigTable());
                 log.info("load KV config table OK");
@@ -58,6 +63,13 @@ public class KVConfigManager {
         }
     }
 
+    /**
+     * 设置配置表
+     *
+     * @param namespace
+     * @param key
+     * @param value
+     */
     public void putKVConfig(final String namespace, final String key, final String value) {
         try {
             this.lock.writeLock().lockInterruptibly();
@@ -72,10 +84,10 @@ public class KVConfigManager {
                 final String prev = kvTable.put(key, value);
                 if (null != prev) {
                     log.info("putKVConfig update config item, Namespace: {} Key: {} Value: {}",
-                        namespace, key, value);
+                            namespace, key, value);
                 } else {
                     log.info("putKVConfig create new config item, Namespace: {} Key: {} Value: {}",
-                        namespace, key, value);
+                            namespace, key, value);
                 }
             } finally {
                 this.lock.writeLock().unlock();
@@ -87,6 +99,10 @@ public class KVConfigManager {
         this.persist();
     }
 
+    /**
+     * 持久化内存中的配置表到指定路径文件中
+     * ${user.home}/namesrv/kvConfig.json
+     */
     public void persist() {
         try {
             this.lock.readLock().lockInterruptibly();
@@ -101,7 +117,7 @@ public class KVConfigManager {
                 }
             } catch (IOException e) {
                 log.error("persist kvconfig Exception, "
-                    + this.namesrvController.getNamesrvConfig().getKvConfigPath(), e);
+                        + this.namesrvController.getNamesrvConfig().getKvConfigPath(), e);
             } finally {
                 this.lock.readLock().unlock();
             }
@@ -111,6 +127,12 @@ public class KVConfigManager {
 
     }
 
+    /**
+     * 删除config中指定key
+     *
+     * @param namespace
+     * @param key
+     */
     public void deleteKVConfig(final String namespace, final String key) {
         try {
             this.lock.writeLock().lockInterruptibly();
@@ -119,7 +141,7 @@ public class KVConfigManager {
                 if (null != kvTable) {
                     String value = kvTable.remove(key);
                     log.info("deleteKVConfig delete a config item, Namespace: {} Key: {} Value: {}",
-                        namespace, key, value);
+                            namespace, key, value);
                 }
             } finally {
                 this.lock.writeLock().unlock();
@@ -131,12 +153,19 @@ public class KVConfigManager {
         this.persist();
     }
 
+    /**
+     * 获取该namespace下的配置表
+     *
+     * @param namespace
+     * @return
+     */
     public byte[] getKVListByNamespace(final String namespace) {
         try {
             this.lock.readLock().lockInterruptibly();
             try {
                 HashMap<String, String> kvTable = this.configTable.get(namespace);
                 if (null != kvTable) {
+                    //将内存查询到的数据，设置到新的返回值中
                     KVTable table = new KVTable();
                     table.setTable(kvTable);
                     return table.encode();
@@ -151,6 +180,13 @@ public class KVConfigManager {
         return null;
     }
 
+    /**
+     * 根据key获取对应key的值
+     *
+     * @param namespace
+     * @param key
+     * @return
+     */
     public String getKVConfig(final String namespace, final String key) {
         try {
             this.lock.readLock().lockInterruptibly();
@@ -169,6 +205,9 @@ public class KVConfigManager {
         return null;
     }
 
+    /**
+     * 打印配置表
+     */
     public void printAllPeriodically() {
         try {
             this.lock.readLock().lockInterruptibly();
@@ -178,14 +217,14 @@ public class KVConfigManager {
                 {
                     log.info("configTable SIZE: {}", this.configTable.size());
                     Iterator<Entry<String, HashMap<String, String>>> it =
-                        this.configTable.entrySet().iterator();
+                            this.configTable.entrySet().iterator();
                     while (it.hasNext()) {
                         Entry<String, HashMap<String, String>> next = it.next();
                         Iterator<Entry<String, String>> itSub = next.getValue().entrySet().iterator();
                         while (itSub.hasNext()) {
                             Entry<String, String> nextSub = itSub.next();
                             log.info("configTable NS: {} Key: {} Value: {}", next.getKey(), nextSub.getKey(),
-                                nextSub.getValue());
+                                    nextSub.getValue());
                         }
                     }
                 }

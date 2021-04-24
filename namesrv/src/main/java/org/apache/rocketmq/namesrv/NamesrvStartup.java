@@ -41,6 +41,9 @@ import org.apache.rocketmq.srvutil.ServerUtil;
 import org.apache.rocketmq.srvutil.ShutdownHookThread;
 import org.slf4j.LoggerFactory;
 
+/**
+ * nameserver启动
+ */
 public class NamesrvStartup {
 
     private static InternalLogger log;
@@ -79,9 +82,13 @@ public class NamesrvStartup {
             return null;
         }
 
+        //nameserver的配置
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
+        //nameserver netty服务器配置
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
+        //设置nameserver端口为9876
         nettyServerConfig.setListenPort(9876);
+        //如果指定了配置文件，则读取配置文件内容覆盖默认配置
         if (commandLine.hasOption('c')) {
             String file = commandLine.getOptionValue('c');
             if (file != null) {
@@ -98,6 +105,7 @@ public class NamesrvStartup {
             }
         }
 
+        //打印nameserver配置信息
         if (commandLine.hasOption('p')) {
             InternalLogger console = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_CONSOLE_NAME);
             MixAll.printObjectProperties(console, namesrvConfig);
@@ -105,6 +113,7 @@ public class NamesrvStartup {
             System.exit(0);
         }
 
+        //将命令行中nameserver的配置，覆盖到配置中
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), namesrvConfig);
 
         if (null == namesrvConfig.getRocketmqHome()) {
@@ -112,6 +121,7 @@ public class NamesrvStartup {
             System.exit(-2);
         }
 
+        //将配置信息打印到日志文件中
         LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
         JoranConfigurator configurator = new JoranConfigurator();
         configurator.setContext(lc);
@@ -137,6 +147,7 @@ public class NamesrvStartup {
             throw new IllegalArgumentException("NamesrvController is null");
         }
 
+        //初始化
         boolean initResult = controller.initialize();
         if (!initResult) {
             controller.shutdown();
@@ -151,6 +162,7 @@ public class NamesrvStartup {
             }
         }));
 
+        //启动
         controller.start();
 
         return controller;

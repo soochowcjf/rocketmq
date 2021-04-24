@@ -284,6 +284,7 @@ public class RemotingCommand {
     public void markResponseType() {
         //1 左移 0位 还是1
         int bits = 1 << RPC_TYPE;
+        //将flag设置为1
         this.flag |= bits;
     }
 
@@ -295,6 +296,13 @@ public class RemotingCommand {
         this.customHeader = customHeader;
     }
 
+    /**
+     * 将消息头中的extFields封装到类中
+     *
+     * @param classHeader
+     * @return
+     * @throws RemotingCommandException
+     */
     public CommandCustomHeader decodeCommandCustomHeader(Class<? extends CommandCustomHeader> classHeader) throws RemotingCommandException {
         CommandCustomHeader objectHeader;
         try {
@@ -529,13 +537,15 @@ public class RemotingCommand {
     }
 
     public void markOnewayRPC() {
+        //1 左移1位 等于2
         int bits = 1 << RPC_ONEWAY;
+        //等于2为单向发送
         this.flag |= bits;
     }
 
     public static void main(String[] args) {
-        System.out.println(1<<RPC_ONEWAY);
-        System.out.println((1<<RPC_ONEWAY)|0);
+        System.out.println(1 << RPC_ONEWAY);
+        System.out.println((1 << RPC_ONEWAY) | 0);
 
         int bits = 1 << RPC_TYPE;
         System.out.println(bits);

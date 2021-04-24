@@ -94,7 +94,7 @@ public interface RemotingServer extends RemotingService {
             RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException;
 
     /**
-     * 单次发送
+     * 单向发送
      *
      * @param channel
      * @param request

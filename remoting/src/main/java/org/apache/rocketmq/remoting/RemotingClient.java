@@ -76,7 +76,7 @@ public interface RemotingClient extends RemotingService {
             RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException;
 
     /**
-     * 单次发送
+     * 单向发送
      *
      * @param addr
      * @param request

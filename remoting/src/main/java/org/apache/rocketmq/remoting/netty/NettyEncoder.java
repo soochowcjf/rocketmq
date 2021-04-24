@@ -20,25 +20,33 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
+
 import java.nio.ByteBuffer;
+
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * @Sharable
+ * 表示该handler是单类的，每个channel中pipeline中该handler是一样的，这里没有成员变量，所以也不存在线程安全问题
+ */
 @ChannelHandler.Sharable
 public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
 
     @Override
     public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out)
-        throws Exception {
+            throws Exception {
         try {
+            //先encode头部到byteBuf
             ByteBuffer header = remotingCommand.encodeHeader();
             out.writeBytes(header);
             byte[] body = remotingCommand.getBody();
             if (body != null) {
+                //再写入消息体
                 out.writeBytes(body);
             }
         } catch (Exception e) {

@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.rocketmq.common.Configuration;
 import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.constant.LoggerName;
@@ -46,8 +47,9 @@ public class NamesrvController {
 
     private final NettyServerConfig nettyServerConfig;
 
-    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
-        "NSScheduledThread"));
+    private final ScheduledExecutorService scheduledExecutorService =
+            Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("NSScheduledThread"));
+
     private final KVConfigManager kvConfigManager;
     private final RouteInfoManager routeInfoManager;
 
@@ -65,35 +67,37 @@ public class NamesrvController {
         this.nettyServerConfig = nettyServerConfig;
         this.kvConfigManager = new KVConfigManager(this);
         this.routeInfoManager = new RouteInfoManager();
+        //ChannelEventListener
         this.brokerHousekeepingService = new BrokerHousekeepingService(this);
-        this.configuration = new Configuration(
-            log,
-            this.namesrvConfig, this.nettyServerConfig
-        );
+        this.configuration = new Configuration(log, this.namesrvConfig, this.nettyServerConfig);
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
     }
 
     public boolean initialize() {
 
+        //初始化时从磁盘${user.home}/namesrv/kvConfig.json加载配置表到内存中去
         this.kvConfigManager.load();
 
+        //构造netty的服务器
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
+        //初始化固定大小的线程池，用于处理nameserver服务端接收到的客户端请求
         this.remotingExecutor =
-            Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
+                Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
 
+        //注册nameserver服务端默认的请求处理器
         this.registerProcessor();
 
+        //启动一个间隔10s的task，用于检查无效的broker信息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-
             @Override
             public void run() {
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
             }
         }, 5, 10, TimeUnit.SECONDS);
 
+        //启动一个间隔10min的task，用于打印当前的nameserver的路由信息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-
             @Override
             public void run() {
                 NamesrvController.this.kvConfigManager.printAllPeriodically();
@@ -104,35 +108,37 @@ public class NamesrvController {
             // Register a listener to reload SslContext
             try {
                 fileWatchService = new FileWatchService(
-                    new String[] {
-                        TlsSystemConfig.tlsServerCertPath,
-                        TlsSystemConfig.tlsServerKeyPath,
-                        TlsSystemConfig.tlsServerTrustCertPath
-                    },
-                    new FileWatchService.Listener() {
-                        boolean certChanged, keyChanged = false;
-                        @Override
-                        public void onChanged(String path) {
-                            if (path.equals(TlsSystemConfig.tlsServerTrustCertPath)) {
-                                log.info("The trust certificate changed, reload the ssl context");
-                                reloadServerSslContext();
+                        new String[]{
+                                TlsSystemConfig.tlsServerCertPath,
+                                TlsSystemConfig.tlsServerKeyPath,
+                                TlsSystemConfig.tlsServerTrustCertPath
+                        },
+                        new FileWatchService.Listener() {
+                            boolean certChanged, keyChanged = false;
+
+                            @Override
+                            public void onChanged(String path) {
+                                if (path.equals(TlsSystemConfig.tlsServerTrustCertPath)) {
+                                    log.info("The trust certificate changed, reload the ssl context");
+                                    reloadServerSslContext();
+                                }
+                                if (path.equals(TlsSystemConfig.tlsServerCertPath)) {
+                                    certChanged = true;
+                                }
+                                if (path.equals(TlsSystemConfig.tlsServerKeyPath)) {
+                                    keyChanged = true;
+                                }
+                                if (certChanged && keyChanged) {
+                                    log.info("The certificate and private key changed, reload the ssl context");
+                                    certChanged = keyChanged = false;
+                                    reloadServerSslContext();
+                                }
                             }
-                            if (path.equals(TlsSystemConfig.tlsServerCertPath)) {
-                                certChanged = true;
+
+                            private void reloadServerSslContext() {
+                                ((NettyRemotingServer) remotingServer).loadSslContext();
                             }
-                            if (path.equals(TlsSystemConfig.tlsServerKeyPath)) {
-                                keyChanged = true;
-                            }
-                            if (certChanged && keyChanged) {
-                                log.info("The certificate and private key changed, reload the ssl context");
-                                certChanged = keyChanged = false;
-                                reloadServerSslContext();
-                            }
-                        }
-                        private void reloadServerSslContext() {
-                            ((NettyRemotingServer) remotingServer).loadSslContext();
-                        }
-                    });
+                        });
             } catch (Exception e) {
                 log.warn("FileWatchService created error, can't load the certificate dynamically");
             }
@@ -143,18 +149,18 @@ public class NamesrvController {
 
     private void registerProcessor() {
         if (namesrvConfig.isClusterTest()) {
-
             this.remotingServer.registerDefaultProcessor(new ClusterTestRequestProcessor(this, namesrvConfig.getProductEnvName()),
-                this.remotingExecutor);
+                    this.remotingExecutor);
         } else {
-
             this.remotingServer.registerDefaultProcessor(new DefaultRequestProcessor(this), this.remotingExecutor);
         }
     }
 
     public void start() throws Exception {
+        //启动netty服务器监听
         this.remotingServer.start();
 
+        //启动密钥文件变动监听线程
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
